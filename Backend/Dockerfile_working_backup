@@ -1,0 +1,66 @@
+# FROM python:3.11-slim
+
+# WORKDIR /app
+
+# # Install system dependencies
+# RUN apt-get update && apt-get install -y \
+#     curl \
+#     build-essential \
+#     ffmpeg \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Install Poetry
+# RUN pip install poetry
+
+# # Configure Poetry
+# ENV POETRY_NO_INTERACTION=1 \
+#     POETRY_VENV_IN_PROJECT=1
+
+# # Copy EVERYTHING first
+# COPY . .
+
+# # Then install
+# RUN poetry install
+
+# # Create directories
+# RUN mkdir -p uploads page_images
+
+# EXPOSE 8000
+
+# CMD ["poetry", "run", "uvicorn", "ai_agent.api:app", "--host", "0.0.0.0", "--port", "8000"]
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies INCLUDING portaudio19-dev
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    ffmpeg \
+    portaudio19-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN pip install poetry
+
+# Configure Poetry
+ENV POETRY_NO_INTERACTION=1 \
+    POETRY_VENV_IN_PROJECT=1
+
+# Copy EVERYTHING first
+COPY . .
+
+# Install dependencies and whisper, playwright
+RUN poetry install && \
+    poetry run pip install whisper
+
+RUN poetry run playwright install --with-deps chromium
+
+
+# Create directories
+RUN mkdir -p uploads page_images
+
+EXPOSE 8000
+
+CMD ["poetry", "run", "uvicorn", "ai_agent.api:app", "--host", "0.0.0.0", "--port", "8000"]

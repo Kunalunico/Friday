@@ -1,0 +1,138 @@
+# FROM python:3.11-slim
+
+# WORKDIR /app
+
+# # Install system dependencies
+# RUN apt-get update && apt-get install -y \
+#     curl \
+#     build-essential \
+#     ffmpeg \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Install Poetry
+# RUN pip install poetry
+
+# # Configure Poetry
+# ENV POETRY_NO_INTERACTION=1 \
+#     POETRY_VENV_IN_PROJECT=1
+
+# # Copy EVERYTHING first
+# COPY . .
+
+# # Then install
+# RUN poetry install
+
+# # Create directories
+# RUN mkdir -p uploads page_images
+
+# EXPOSE 8000
+
+# CMD ["poetry", "run", "uvicorn", "ai_agent.api:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# FROM python:3.11-slim
+
+# WORKDIR /app
+
+# # Install system dependencies INCLUDING portaudio19-dev
+# RUN apt-get update && apt-get install -y \
+#     curl \
+#     build-essential \
+#     ffmpeg \
+#     portaudio19-dev \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Install Poetry
+# RUN pip install poetry
+
+# # Configure Poetry
+# ENV POETRY_NO_INTERACTION=1 \
+#     POETRY_VENV_IN_PROJECT=1
+
+# # Copy EVERYTHING first
+# COPY . .
+
+# # Install dependencies and whisper, playwright
+# RUN poetry install && \
+#     poetry run pip install whisper
+
+# RUN poetry run playwright install --with-deps chromium
+
+
+# # Create directories
+# RUN mkdir -p uploads page_images
+
+# ENV PORT=8000
+# EXPOSE 8000
+
+# CMD ["sh", "-c", "poetry run uvicorn ai_agent.api:app --host 0.0.0.0 --port $PORT"]
+
+# Build stage
+FROM python:3.11-slim as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    portaudio19-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry and export plugin
+RUN pip install poetry poetry-plugin-export
+
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock* ./
+
+# Create virtual environment in /opt/venv
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Export requirements and install
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes --only=main
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install playwright browsers
+RUN playwright install chromium
+
+# Debug output
+RUN echo "Build stage complete. Contents:" && ls -la /opt/venv/
+
+#============================================
+# Runtime stage
+FROM python:3.11-slim as runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    portaudio19-dev \
+    libnss3 \
+    libnspr4 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libgtk-3-0 \
+    libgbm1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+WORKDIR /app
+
+# Copy virtual environment
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy playwright browsers
+COPY --from=builder /root/.cache/ms-playwright /root/.cache/ms-playwright
+
+# Copy application code
+COPY . .
+
+# Create directories
+RUN mkdir -p uploads page_images
+
+# Use the virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
+
+EXPOSE 8000
+CMD ["python", "-m", "uvicorn", "ai_agent.api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,16 @@
+streamlit==1.41.1
+openai==1.59.3
+google-auth==2.37.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.156.0
+python-dotenv==1.0.1
+aiohttp==3.11.11
+ollama==0.4.5
+dateparser==1.2.0
+gtts==2.5.4
+pyaudio==0.2.14
+google-auth-httplib2==0.2.0
+chattts==0.2.1
+uvicorn==0.30.6
+loguru==0.7.2
+fastapi==0.104.1
